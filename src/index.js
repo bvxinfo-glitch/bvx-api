@@ -67,6 +67,20 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
 
+// getInitParams — FE gọi lúc bootstrap
+app.all("/getInitParams", (_req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  res.json({
+    ok: true,
+    init: {
+      today,
+      userRole: "viewer",
+      featureFlags: ["kpi-v1"],
+      version: 1
+    }
+  });
+});
+
 // whoAmI — dùng cho màn login
 app.post("/whoAmI", async (req, res) => {
   try {
