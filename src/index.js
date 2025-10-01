@@ -63,12 +63,8 @@ const SQL_GET_USER = `
 `;
 
 // ===== Routes =====
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, ts: Date.now() });
-});
-
 // getInitParams — FE gọi lúc bootstrap
-app.all("/getInitParams", (_req, res) => {
+const getInitHandler = (_req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   res.json({
     ok: true,
@@ -79,7 +75,10 @@ app.all("/getInitParams", (_req, res) => {
       version: 1
     }
   });
-});
+};
+
+app.get("/getInitParams", getInitHandler);
+app.post("/getInitParams", getInitHandler);
 
 // whoAmI — dùng cho màn login
 app.post("/whoAmI", async (req, res) => {
