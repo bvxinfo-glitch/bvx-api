@@ -1,0 +1,6 @@
+node_modules/
+.env
+.env.local
+.DS_Store
+cloud-sql-proxy.log
+firebase-debug.log
