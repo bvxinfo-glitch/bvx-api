@@ -40,6 +40,15 @@ app.use(
 );
 app.options("*", cors());
 
+// ✅ Ngăn cache
+app.use((req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  res.set("Surrogate-Control", "no-store");
+  next();
+});
+
 // ===== JSON body =====
 app.use(express.json({ limit: "2mb" }));
 
@@ -160,6 +169,30 @@ const toRoleLevel = (txt) => {
   if (t.includes("manager") || t.includes("lead") || t.includes("trưởng")) return 50;
   return 10; // mặc định employee
 };
+
+// === Session helpers ===
+function clearSession() {
+  try {
+    // xoá những key bạn đang dùng
+    localStorage.removeItem('bvx_user');
+    localStorage.removeItem('bvx_lastManv');
+    localStorage.removeItem('bvx_role');
+    localStorage.removeItem('bvx_token');     // nếu có
+    sessionStorage.clear();
+  } catch (e) {}
+}
+
+async function doLogout() {
+  try {
+    // gọi API, nhưng dù lỗi vẫn xoá local state
+    await apiRun('/logout', {}, 'POST');
+  } catch (e) {}
+  clearSession();
+
+  // về lại màn login: giữ nguyên origin & path
+  location.href = location.origin + location.pathname;
+}
+
 
 // ===== checkUserAuth — xác thực PIN =====
 app.post("/checkUserAuth", async (req, res) => {
