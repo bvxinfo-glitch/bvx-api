@@ -150,10 +150,8 @@ app.all(
 
 // ====== LOGOUT (UI cần ping để reset state client) ======
 app.all(["/logout", "/signout"], (_req, res) => {
-  // Không có session server-side nên chỉ trả OK cho FE tự xoá localStorage
   res.json({ ok: true });
 });
-
 // ===== Helpers dùng lại =====
 const isYes = (v) => String(v || "").trim().toUpperCase().startsWith("Y");
 const toRoleLevel = (txt) => {
