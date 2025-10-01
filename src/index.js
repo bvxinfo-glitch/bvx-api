@@ -97,6 +97,102 @@ app.post("/whoAmI", async (req, res) => {
   }
 });
 
+// ===== Helpers dùng lại =====
+const isYes = (v) => String(v || "").trim().toUpperCase().startsWith("Y");
+const toRoleLevel = (txt) => {
+  const t = String(txt || "").toLowerCase();
+  if (t.includes("admin")) return 90;
+  if (t.includes("manager") || t.includes("lead") || t.includes("trưởng")) return 50;
+  return 10; // mặc định employee
+};
+
+// SQL lấy user theo manv (để lấy scopeView khi lọc InScope)
+const SQL_SELECT_USER_BY_MANV = `
+  SELECT "scopeView" AS scope_view
+  FROM public."KPI_Users"
+  WHERE upper(name_code) = upper($1)
+  LIMIT 1
+`;
+
+// SQL list users active
+const SQL_LIST_USERS = `
+  SELECT
+    name_code      AS manv,
+    full_name      AS full_name,
+    role           AS role,
+    "roleLevel"    AS role_level_txt,
+    "canApprove"   AS can_approve_txt,
+    "canAdjust"    AS can_adjust_txt,
+    team           AS team_main,
+    "scopeView"    AS scope_view,
+    active         AS active_txt
+  FROM public."KPI_Users"
+  WHERE upper(coalesce(active, '')) LIKE 'Y%'
+  ORDER BY name_code
+  LIMIT 500
+`;
+
+async function listUsersHandler(req, res) {
+  try {
+    const body = req.body || {};
+    const meManv = String(body.manv || "").trim().toUpperCase();
+
+    // lấy danh sách users active
+    const { rows } = await pool.query(SQL_LIST_USERS);
+    let items = rows.map(r => ({
+      manv: r.manv,
+      full_name: r.full_name,
+      role: r.role,
+      role_level: toRoleLevel(r.role_level_txt),
+      can_approve: isYes(r.can_approve_txt),
+      can_adjust: isYes(r.can_adjust_txt),
+      team_main: r.team_main,
+      scope_view: r.scope_view,
+      active: isYes(r.active_txt)
+    }));
+
+    // Nếu endpoint là *InScope thì lọc theo scopeView của người gọi (meManv)
+    const path = req.path.toLowerCase();
+    const wantScope = path.includes("inscope");
+
+    if (wantScope && meManv) {
+      const me = await pool.query(SQL_SELECT_USER_BY_MANV, [meManv]);
+      const scopeStr = String(me.rows?.[0]?.scope_view || "");
+      const scopeArr = scopeStr
+        .toUpperCase()
+        .split(/[,;|\s]+/)
+        .filter(Boolean);
+      if (scopeArr.length) {
+        items = items.filter(it => {
+          const t = String(it.team_main || "").toUpperCase();
+          return !t || scopeArr.includes(t);
+        });
+      }
+    }
+
+    res.json({ ok: true, items, total: items.length });
+  } catch (err) {
+    console.error("listUsersHandler error:", err);
+    res.status(500).json({ ok: false, error: String(err.message || err) });
+  }
+}
+
+// Gắn nhiều alias để khớp FE
+app.post(
+  [
+    "/users/list",
+    "/users/listInScope",
+    "/listUsers",
+    "/listUsersInScope",
+    "/getUsers",
+    "/users",
+    "/user/list",
+    "/user/search",
+  ],
+  listUsersHandler
+);
+
+
 // Enrich 1 user
 app.post("/users/enrich", async (req, res) => {
   try {
