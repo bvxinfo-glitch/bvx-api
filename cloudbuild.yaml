@@ -1,0 +1,19 @@
+steps:
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy Cloud Run (bvx-api)
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        gcloud run deploy bvx-api \
+          --project=bvx-zalo-app-32f90 \
+          --region=asia-southeast1 \
+          --source=. \
+          --allow-unauthenticated \
+          --service-account=bvx-zalo-app-32f90@appspot.gserviceaccount.com \
+          --add-cloudsql-instances=bvx-zalo-app-32f90:asia-southeast1:bvx-postgres \
+          --set-env-vars \
+PGHOST=/cloudsql/bvx-zalo-app-32f90:asia-southeast1:bvx-postgres,PGPORT=5432,PGUSER=kpi_user,PGPASSWORD=DriverStrong#2025,PGDATABASE=kpi_db,API_KEY=yZtE4ArHtzHmQG6rYLeToeu0ghxAxsTKOVXJzkzGRfQ=,ALLOW_ORIGIN=https://kpi.bvx.com.vn
+
+options:
+  logging: CLOUD_LOGGING_ONLY
