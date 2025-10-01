@@ -90,7 +90,8 @@ app.post("/whoAmI", async (req, res) => {
     if (rows.length === 0) return res.status(404).json({ ok: false, error: "User not found" });
 
     // trả nguyên row; nếu muốn map field FE thì bổ sung mapper sau
-    res.json({ ok: true, user: rows[0] });
+      const user = { ...rows[0], name: rows[0].full_name };
+      res.json({ ok: true, user });
   } catch (e) {
     console.error("whoAmI error:", e);
     res.status(500).json({ ok: false, error: String(e.message || e) });
@@ -139,17 +140,18 @@ async function listUsersHandler(req, res) {
 
     // lấy danh sách users active
     const { rows } = await pool.query(SQL_LIST_USERS);
-    let items = rows.map(r => ({
-      manv: r.manv,
-      full_name: r.full_name,
-      role: r.role,
-      role_level: toRoleLevel(r.role_level_txt),
-      can_approve: isYes(r.can_approve_txt),
-      can_adjust: isYes(r.can_adjust_txt),
-      team_main: r.team_main,
-      scope_view: r.scope_view,
-      active: isYes(r.active_txt)
-    }));
+      let items = rows.map(r => ({
+        manv: r.manv,
+        name: r.full_name,          // 👈 thêm dòng này
+        full_name: r.full_name,
+        role: r.role,
+        role_level: toRoleLevel(r.role_level_txt),
+        can_approve: isYes(r.can_approve_txt),
+        can_adjust: isYes(r.can_adjust_txt),
+        team_main: r.team_main,
+        scope_view: r.scope_view,
+        active: isYes(r.active_txt)
+      }));
 
     // Nếu endpoint là *InScope thì lọc theo scopeView của người gọi (meManv)
     const path = req.path.toLowerCase();
@@ -202,7 +204,8 @@ app.post("/users/enrich", async (req, res) => {
     const { rows } = await pool.query(SQL_GET_USER, [manv]);
     if (rows.length === 0) return res.status(404).json({ ok: false, error: "User not found" });
 
-    res.json({ ok: true, user: rows[0] });
+      const user = { ...rows[0], name: rows[0].full_name };
+      res.json({ ok: true, user });
   } catch (e) {
     console.error("enrich error:", e);
     res.status(500).json({ ok: false, error: String(e.message || e) });
@@ -218,7 +221,9 @@ app.post("/users/enrichBatch", async (req, res) => {
     const q = 'SELECT * FROM public."KPI_Users" WHERE upper(name_code) = ANY($1::text[])';
     const { rows } = await pool.query(q, [manvs]);
     const map = {};
-    rows.forEach(r => { map[r.name_code?.toUpperCase?.() || r.name_code] = r; });
+      rows.forEach(r => {
+        map[r.name_code?.toUpperCase?.() || r.name_code] = { ...r, name: r.full_name };
+      });
     res.json({ ok: true, users: map });
   } catch (e) {
     console.error("enrichBatch error:", e);
