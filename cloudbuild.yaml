@@ -1,17 +1,11 @@
-# cloudbuild.yaml — build Docker image, push to Artifact Registry, deploy Cloud Run
+# cloudbuild.yaml — Build Docker image -> Push Artifact Registry -> Deploy Cloud Run (with Secret Manager)
+
 substitutions:
   _REGION: asia-southeast1
   _SERVICE: bvx-api
-  _REPO: cloud-run-source-deploy               # tên repo Artifact Registry (đã có)
+  _REPO: cloud-run-source-deploy
   _DB_INSTANCE: bvx-zalo-app-32f90:asia-southeast1:bvx-postgres
   _SA_EMAIL: bvx-zalo-app-32f90@appspot.gserviceaccount.com
-  # TODO: chỉnh lại nếu cần. Có thể dùng Secret Manager thay vì để thẳng ra.
-  _ENV_VARS: >-
-    PGHOST=/cloudsql/bvx-zalo-app-32f90:asia-southeast1:bvx-postgres,
-    PGPORT=5432,
-    PGUSER=postgres,
-    PGDATABASE=bvx,
-    API_KEY=yZtE4ArHtzHmQG6rYLeToeu0ghxAxsTKOVXJzkzGRfQ=
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -31,7 +25,7 @@ steps:
       - push
       - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
 
-  # 3) Deploy Cloud Run bằng image vừa push (KHÔNG dùng --source nữa)
+  # 3) Deploy Cloud Run bằng image vừa push (KHÔNG dùng --source)
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
     args:
@@ -44,8 +38,12 @@ steps:
       - --allow-unauthenticated
       - --service-account=$_SA_EMAIL
       - --add-cloudsql-instances=$_DB_INSTANCE
-      - --set-env-vars
-      - $_ENV_VARS
+
+      # Secrets: map biến môi trường -> secret:version
+      - --set-secrets=PGPASSWORD=PGPASSWORD:latest,API_KEY=DB_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest
+
+      # Biến môi trường không nhạy cảm
+      - --set-env-vars=PGHOST=/cloudsql/bvx-zalo-app-32f90:asia-southeast1:bvx-postgres,PGPORT=5432,PGUSER=postgres,PGDATABASE=bvx
 
 images:
   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
