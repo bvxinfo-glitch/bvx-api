@@ -98,6 +98,50 @@ app.post("/whoAmI", async (req, res) => {
   }
 });
 
+// ====== PLAN / ROUNDS ======
+const SQL_GET_PLAN_FOR_USER = `
+  SELECT
+    id,
+    ma_vong   AS vong,
+    bien_so   AS plate,
+    gio_di    AS start_time,
+    gio_ve    AS end_time,
+    NULL::text AS route,
+    ngay_txt  AS date,
+    manv
+  FROM public.rounds
+  WHERE upper(manv) = upper($1) AND ngay_txt = $2
+  ORDER BY gio_di NULLS LAST, id
+`;
+
+// Hỗ trợ nhiều alias để khớp FE
+app.post(
+  ["/getPlanForUser", "/plan/get", "/planForUser", "/getRoundsForUser"],
+  async (req, res) => {
+    try {
+      const manv = up(req.body?.manv);
+      let date = (req.body?.date || "").toString().slice(0, 10);
+      if (!date) {
+        // fallback: hôm nay (UTC) nếu FE không gửi date
+        date = new Date().toISOString().slice(0, 10);
+      }
+      if (!manv) return res.status(400).json({ ok: false, error: "manv_required" });
+
+      const { rows } = await pool.query(SQL_GET_PLAN_FOR_USER, [manv, date]);
+      return res.json({ ok: true, rounds: rows, total: rows.length });
+    } catch (e) {
+      console.error("getPlanForUser error:", e);
+      return res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+  }
+);
+
+// ====== LOGOUT (UI cần ping để reset state client) ======
+app.post(["/logout", "/signout"], (_req, res) => {
+  // Không có session server-side nên chỉ trả OK cho FE tự xoá localStorage
+  res.json({ ok: true });
+});
+
 // ===== Helpers dùng lại =====
 const isYes = (v) => String(v || "").trim().toUpperCase().startsWith("Y");
 const toRoleLevel = (txt) => {
