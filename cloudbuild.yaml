@@ -25,7 +25,7 @@ steps:
       - push
       - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
 
-  # 3) Deploy Cloud Run bằng image vừa push (KHÔNG dùng --source)
+  # 3) Deploy Cloud Run bằng image vừa push
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
     args:
@@ -39,11 +39,11 @@ steps:
       - --service-account=$_SA_EMAIL
       - --add-cloudsql-instances=$_DB_INSTANCE
 
-      # Secrets: map biến môi trường -> secret:version
-      - --set-secrets=PGPASSWORD=PGPASSWORD:latest,API_KEY=DB_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest
+      # Secrets: dùng đúng secret đang có
+      - --set-secrets=PGPASSWORD=DB_BVX_KEY:latest,API_KEY=DB_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest
 
-      # Biến môi trường không nhạy cảm
-      - --set-env-vars=PGHOST=/cloudsql/bvx-zalo-app-32f90:asia-southeast1:bvx-postgres,PGPORT=5432,PGUSER=postgres,PGDATABASE=bvx
+      # Env không nhạy cảm: dùng user kpi_user + DB kpi_db
+      - --set-env-vars=PGHOST=/cloudsql/bvx-zalo-app-32f90:asia-southeast1:bvx-postgres,PGPORT=5432,PGUSER=kpi_user,PGDATABASE=kpi_db
 
 images:
   - '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPO/$_SERVICE:$SHORT_SHA'
