@@ -107,6 +107,44 @@ const toRoleLevel = (txt) => {
   return 10; // mặc định employee
 };
 
+// checkUserAuth — xác thực PIN
+app.post("/checkUserAuth", async (req, res) => {
+  try {
+    const manv = up(req.body?.manv);
+    const pin  = String(req.body?.pin ?? "");
+
+    if (!manv || !pin) {
+      return res.status(400).json({ ok: false, error: "manv_and_pin_required" });
+    }
+
+    const { rows } = await pool.query(SQL_GET_USER, [manv]);
+    if (rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "NOT_FOUND" });
+    }
+
+    const u = rows[0];
+
+    // kiểm tra active = 'Y...'
+    const isActive = String(u.active || "").trim().toUpperCase().startsWith("Y");
+    if (!isActive) {
+      return res.json({ ok: false, error: "INACTIVE" });
+    }
+
+    // DB của bạn đang lưu PIN dạng plain ở cột "pin"
+    const dbPin = String(u.pin ?? u.pin_plain ?? "");
+    if (!dbPin || dbPin !== pin) {
+      return res.json({ ok: false, error: "INVALID_PIN" });
+    }
+
+    // Trả về user (thêm field "name" cho FE)
+    return res.json({ ok: true, user: { ...u, name: u.full_name } });
+  } catch (e) {
+    console.error("checkUserAuth error:", e);
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
+
+
 // SQL lấy user theo manv (để lấy scopeView khi lọc InScope)
 const SQL_SELECT_USER_BY_MANV = `
   SELECT "scopeView" AS scope_view
@@ -194,6 +232,47 @@ app.post(
   listUsersHandler
 );
 
+// ====== CHECK USER AUTH (PIN) ======
+app.post("/checkUserAuth", async (req, res) => {
+  try {
+    const manv = up(req.body?.manv);
+    const pin  = (req.body?.pin ?? "").toString().trim();
+
+    if (!manv) return res.status(400).json({ ok: false, error: "manv required" });
+    if (!pin)  return res.status(400).json({ ok: false, error: "pin required" });
+
+    // lấy user theo name_code
+    const { rows } = await pool.query(SQL_GET_USER, [manv]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: "NOT_FOUND" });
+
+    const u = rows[0];
+
+    // kiểm tra active (nếu dùng 'Y'/'N')
+    const activeTxt = (u.active ?? "").toString().trim().toUpperCase();
+    if (activeTxt && !activeTxt.startsWith("Y")) {
+      return res.json({ ok: false, error: "INACTIVE" });
+    }
+
+    // cột PIN trong DB của bạn đang là 'pin' (plaintext)
+    // nếu ở DB tên khác (vd: pin_plain) thì đổi u.pin -> u.pin_plain
+    if (!u.pin || String(u.pin) !== pin) {
+      return res.json({ ok: false, error: "INVALID_PIN" });
+    }
+
+    // nếu có hạn PIN
+    if (u.pin_expires_at && !isNaN(Date.parse(u.pin_expires_at))) {
+      if (new Date(u.pin_expires_at) < new Date()) {
+        return res.json({ ok: false, error: "PIN_EXPIRED" });
+      }
+    }
+
+    // trả về user (FE chỉ cần vậy)
+    return res.json({ ok: true, user: u });
+  } catch (e) {
+    console.error("checkUserAuth error:", e);
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
+});
 
 // Enrich 1 user
 app.post("/users/enrich", async (req, res) => {
